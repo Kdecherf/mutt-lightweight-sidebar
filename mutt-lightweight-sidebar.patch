@@ -1,6 +1,6 @@
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -32,6 +32,7 @@ mutt_SOURCES = \
+@@ -33,6 +33,7 @@ mutt_SOURCES = \
  	rfc822.c rfc1524.c rfc2047.c rfc2231.c rfc3676.c \
  	score.c send.c sendlib.c signal.c sort.c \
  	status.c system.c thread.c charset.c history.c lib.c \
@@ -10,7 +10,7 @@
  
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -129,7 +129,8 @@ am_mutt_OBJECTS = addrbook.$(OBJEXT) alias.$(OBJEXT) attach.$(OBJEXT) \
+@@ -130,7 +130,8 @@ am_mutt_OBJECTS = addrbook.$(OBJEXT) alias.$(OBJEXT) attach.$(OBJEXT) \
  	system.$(OBJEXT) thread.$(OBJEXT) charset.$(OBJEXT) \
  	history.$(OBJEXT) lib.$(OBJEXT) muttlib.$(OBJEXT) \
  	editmsg.$(OBJEXT) mbyte.$(OBJEXT) url.$(OBJEXT) \
@@ -20,7 +20,7 @@
  am__objects_1 =
  am__objects_2 = patchlist.$(OBJEXT) conststrings.$(OBJEXT) \
  	$(am__objects_1)
-@@ -468,7 +469,8 @@ mutt_SOURCES = \
+@@ -475,7 +476,8 @@ mutt_SOURCES = \
  	score.c send.c sendlib.c signal.c sort.c \
  	status.c system.c thread.c charset.c history.c lib.c \
  	muttlib.c editmsg.c mbyte.c \
@@ -29,8 +29,8 @@
 +	sidebar.c
  
  nodist_mutt_SOURCES = $(BUILT_SOURCES)
- mutt_LDADD = @MUTT_LIB_OBJECTS@ @LIBOBJS@ $(LIBIMAP) $(MUTTLIBS) \
-@@ -500,7 +502,7 @@ EXTRA_DIST = COPYRIGHT GPL OPS OPS.PGP OPS.CRYPT OPS.SMIME TODO UPDATING \
+ mutt_LDADD = $(MUTT_LIB_OBJECTS) $(LIBOBJS) $(LIBIMAP) $(MUTTLIBS) \
+@@ -507,7 +509,7 @@ EXTRA_DIST = COPYRIGHT GPL OPS OPS.PGP OPS.CRYPT OPS.SMIME TODO UPDATING \
  	README.SSL smime.h group.h \
  	muttbug pgppacket.h depcomp ascii.h BEWARE PATCHES patchlist.sh \
  	ChangeLog mkchangelog.sh mutt_idna.h \
@@ -139,7 +139,7 @@
    return 0;
  }
  
-@@ -306,6 +354,11 @@ static int buffy_maildir_hasnew (BUFFY* mailbox)
+@@ -306,6 +354,11 @@ static int buffy_maildir_dir_hasnew(BUFFY* mailbox, const char *dir_name)
        return 0;
    }
  
@@ -151,7 +151,7 @@
    if ((dirp = opendir (path)) == NULL)
    {
      mailbox->magic = 0;
-@@ -340,6 +393,45 @@ static int buffy_maildir_hasnew (BUFFY* mailbox)
+@@ -340,6 +393,45 @@ static int buffy_maildir_dir_hasnew(BUFFY* mailbox, const char *dir_name)
    return rc;
  }
  
@@ -194,10 +194,10 @@
 +  mailbox->sb_last_checked = time(NULL);
 +}
 +
- /* returns 1 if mailbox has new mail */ 
- static int buffy_mbox_hasnew (BUFFY* mailbox, struct stat *sb)
+ /* returns 1 if maildir has new mail */
+ static int buffy_maildir_hasnew (BUFFY* mailbox)
  {
-@@ -351,7 +443,7 @@ static int buffy_mbox_hasnew (BUFFY* mailbox, struct stat *sb)
+@@ -368,7 +460,7 @@ static int buffy_mbox_hasnew (BUFFY* mailbox, struct stat *sb)
    else
      statcheck = sb->st_mtime > sb->st_atime
        || (mailbox->newly_created && sb->st_ctime == sb->st_mtime && sb->st_ctime == sb->st_atime);
@@ -206,7 +206,7 @@
    {
      if (!option(OPTMAILCHECKRECENT) || sb->st_mtime > mailbox->last_visited)
      {
-@@ -371,6 +463,27 @@ static int buffy_mbox_hasnew (BUFFY* mailbox, struct stat *sb)
+@@ -388,6 +480,27 @@ static int buffy_mbox_hasnew (BUFFY* mailbox, struct stat *sb)
    return rc;
  }
  
@@ -234,7 +234,7 @@
  int mutt_buffy_check (int force)
  {
    BUFFY *tmp;
-@@ -444,17 +557,20 @@ int mutt_buffy_check (int force)
+@@ -461,17 +574,20 @@ int mutt_buffy_check (int force)
        {
        case M_MBOX:
        case M_MMDF:
@@ -280,10 +280,10 @@
  
 --- a/color.c
 +++ b/color.c
-@@ -93,6 +93,8 @@ static const struct mapping_t Fields[] =
-   { "bold",		MT_COLOR_BOLD },
+@@ -94,6 +94,8 @@ static const struct mapping_t Fields[] =
    { "underline",	MT_COLOR_UNDERLINE },
    { "index",		MT_COLOR_INDEX },
+   { "prompt",		MT_COLOR_PROMPT },
 +  { "sidebar_new",	MT_COLOR_NEW },
 +  { "sidebar_flagged",	MT_COLOR_FLAGGED },
    { NULL,		0 }
@@ -309,8 +309,8 @@
  
    if ((WithCrypto & (APPLICATION_PGP | APPLICATION_SMIME)) == 0)
    {
-@@ -142,7 +142,7 @@ static void redraw_crypt_lines (HEADER *msg)
-   }
+@@ -145,7 +145,7 @@ static void redraw_crypt_lines (HEADER *msg)
+       addstr (_(" (OppEnc mode)"));
  
    clrtoeol ();
 -  move (HDR_CRYPTINFO, 0);
@@ -318,7 +318,7 @@
    clrtoeol ();
  
    if ((WithCrypto & APPLICATION_PGP)
-@@ -159,7 +159,7 @@ static void redraw_crypt_lines (HEADER *msg)
+@@ -162,7 +162,7 @@ static void redraw_crypt_lines (HEADER *msg)
        && (msg->security & ENCRYPT)
        && SmimeCryptAlg
        && *SmimeCryptAlg) {
@@ -327,7 +327,7 @@
  		NONULL(SmimeCryptAlg));
    }
  }
-@@ -172,7 +172,7 @@ static void redraw_mix_line (LIST *chain)
+@@ -175,7 +175,7 @@ static void redraw_mix_line (LIST *chain)
    int c;
    char *t;
  
@@ -336,7 +336,7 @@
  
    if (!chain)
    {
-@@ -187,7 +187,7 @@ static void redraw_mix_line (LIST *chain)
+@@ -190,7 +190,7 @@ static void redraw_mix_line (LIST *chain)
      if (t && t[0] == '0' && t[1] == '\0')
        t = "<random>";
      
@@ -345,7 +345,7 @@
        break;
  
      addstr (NONULL(t));
-@@ -239,7 +239,7 @@ static void draw_envelope_addr (int line, ADDRESS *addr)
+@@ -242,7 +242,7 @@ static void draw_envelope_addr (int line, ADDRESS *addr)
  
    buf[0] = 0;
    rfc822_write_address (buf, sizeof (buf), addr, 1);
@@ -354,7 +354,7 @@
    mutt_paddstr (W, buf);
  }
  
-@@ -249,10 +249,10 @@ static void draw_envelope (HEADER *msg, char *fcc)
+@@ -252,10 +252,10 @@ static void draw_envelope (HEADER *msg, char *fcc)
    draw_envelope_addr (HDR_TO, msg->env->to);
    draw_envelope_addr (HDR_CC, msg->env->cc);
    draw_envelope_addr (HDR_BCC, msg->env->bcc);
@@ -367,7 +367,7 @@
    mutt_paddstr (W, fcc);
  
    if (WithCrypto)
-@@ -263,7 +263,7 @@ static void draw_envelope (HEADER *msg, char *fcc)
+@@ -266,7 +266,7 @@ static void draw_envelope (HEADER *msg, char *fcc)
  #endif
  
    SETCOLOR (MT_COLOR_STATUS);
@@ -376,7 +376,7 @@
    clrtoeol ();
  
    NORMAL_COLOR;
-@@ -299,7 +299,7 @@ static int edit_address_list (int line, ADDRESS **addr)
+@@ -302,7 +302,7 @@ static int edit_address_list (int line, ADDRESS **addr)
    /* redraw the expanded list so the user can see the result */
    buf[0] = 0;
    rfc822_write_address (buf, sizeof (buf), *addr, 1);
@@ -385,7 +385,7 @@
    mutt_paddstr (W, buf);
    
    return 0;
-@@ -544,7 +544,7 @@ int mutt_compose_menu (HEADER *msg,   /* structure for new message */
+@@ -562,7 +562,7 @@ int mutt_compose_menu (HEADER *msg,   /* structure for new message */
  	if (mutt_get_field ("Subject: ", buf, sizeof (buf), 0) == 0)
  	{
  	  mutt_str_replace (&msg->env->subject, buf);
@@ -394,7 +394,7 @@
  	  if (msg->env->subject)
  	    mutt_paddstr (W, msg->env->subject);
  	  else
-@@ -562,7 +562,7 @@ int mutt_compose_menu (HEADER *msg,   /* structure for new message */
+@@ -580,7 +580,7 @@ int mutt_compose_menu (HEADER *msg,   /* structure for new message */
  	{
  	  strfcpy (fcc, buf, fcclen);
  	  mutt_pretty_mailbox (fcc, fcclen);
@@ -405,7 +405,7 @@
  	}
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1276,6 +1276,8 @@ if test $mutt_cv_langinfo_yesexpr = yes; then
+@@ -1302,6 +1302,8 @@ if test $mutt_cv_langinfo_yesexpr = yes; then
    AC_DEFINE(HAVE_LANGINFO_YESEXPR,1,[ Define if you have <langinfo.h> and nl_langinfo(YESEXPR). ])
  fi
  
@@ -426,7 +426,7 @@
  
  #ifdef USE_POP
  #include "pop.h"
-@@ -519,20 +521,31 @@ int mutt_index_menu (void)
+@@ -596,20 +598,31 @@ int mutt_index_menu (void)
         menu->redraw |= REDRAW_STATUS;
       if (do_buffy_notify)
       {
@@ -460,7 +460,7 @@
      }
  
      if (menu->menu == MENU_MAIN)
-@@ -554,9 +567,12 @@ int mutt_index_menu (void)
+@@ -631,9 +644,12 @@ int mutt_index_menu (void)
  
        if (menu->redraw & REDRAW_STATUS)
        {
@@ -473,7 +473,7 @@
  	mutt_paddstr (COLS, buf);
  	NORMAL_COLOR;
  	menu->redraw &= ~REDRAW_STATUS;
-@@ -569,7 +585,7 @@ int mutt_index_menu (void)
+@@ -653,7 +669,7 @@ int mutt_index_menu (void)
  	menu->oldcurrent = -1;
  
        if (option (OPTARROWCURSOR))
@@ -482,7 +482,7 @@
        else if (option (OPTBRAILLEFRIENDLY))
  	move (menu->current - menu->top + menu->offset, 0);
        else
-@@ -1011,6 +1027,7 @@ int mutt_index_menu (void)
+@@ -1095,6 +1111,7 @@ int mutt_index_menu (void)
  	  break;
  
  	CHECK_MSGCOUNT;
@@ -490,7 +490,7 @@
  	CHECK_READONLY;
  	{
  	  int oldvcount = Context->vcount;
-@@ -1070,6 +1087,7 @@ int mutt_index_menu (void)
+@@ -1154,6 +1171,7 @@ int mutt_index_menu (void)
  	  menu->redraw = REDRAW_FULL;
  	break;
  
@@ -498,7 +498,7 @@
        case OP_MAIN_CHANGE_FOLDER:
        case OP_MAIN_NEXT_UNREAD_MAILBOX:
  
-@@ -1101,7 +1119,11 @@ int mutt_index_menu (void)
+@@ -1185,7 +1203,11 @@ int mutt_index_menu (void)
  	{
  	  mutt_buffy (buf, sizeof (buf));
  
@@ -511,7 +511,7 @@
  	  {
  	    if (menu->menu == MENU_PAGER)
  	    {
-@@ -1119,6 +1141,7 @@ int mutt_index_menu (void)
+@@ -1203,6 +1225,7 @@ int mutt_index_menu (void)
  	}
  
  	mutt_expand_path (buf, sizeof (buf));
@@ -519,7 +519,7 @@
  	if (mx_get_magic (buf) <= 0)
  	{
  	  mutt_error (_("%s is not a mailbox."), buf);
-@@ -2209,6 +2232,12 @@ int mutt_index_menu (void)
+@@ -2293,6 +2316,12 @@ int mutt_index_menu (void)
  	mutt_what_key();
  	break;
  
@@ -610,7 +610,7 @@
  
 --- a/globals.h
 +++ b/globals.h
-@@ -117,6 +117,9 @@ WHERE short SearchContext;
+@@ -118,6 +118,9 @@ WHERE short SearchContext;
  WHERE char *SendCharset;
  WHERE char *Sendmail;
  WHERE char *Shell;
@@ -620,7 +620,7 @@
  WHERE char *Signature;
  WHERE char *SimpleSearch;
  #if USE_SMTP
-@@ -208,6 +211,9 @@ WHERE short ScoreThresholdDelete;
+@@ -213,6 +216,9 @@ WHERE short ScoreThresholdDelete;
  WHERE short ScoreThresholdRead;
  WHERE short ScoreThresholdFlag;
  
@@ -632,8 +632,8 @@
  WHERE short ImapPipelineDepth;
 --- a/handler.c
 +++ b/handler.c
-@@ -1599,6 +1599,11 @@ int mutt_body_handler (BODY *b, STATE *s)
-   size_t tmplength = 0;
+@@ -1601,6 +1601,11 @@ static int run_decode_and_handler (BODY *b, STATE *s, handler_t handler, int pla
+   int decode = 0;
    int rc = 0;
  
 +#ifdef HAVE_FMEMOPEN
@@ -641,63 +641,63 @@
 +  size_t tempsize;
 +#endif
 +
-   int oflags = s->flags;
-   
-   /* first determine which handler to use to process this part */
-@@ -1711,6 +1716,14 @@ int mutt_body_handler (BODY *b, STATE *s)
+   fseeko (s->fpin, b->offset, 0);
+ 
+   /* see if we need to decode this part before processing it */
+@@ -1618,6 +1623,14 @@ static int run_decode_and_handler (BODY *b, STATE *s, handler_t handler, int pla
+     {
+       /* decode to a tempfile, saving the original destination */
+       fp = s->fpout;
++#ifdef HAVE_FMEMOPEN
++      if ((s->fpout = open_memstream(&temp, &tempsize)) == NULL)
++      {
++        mutt_error _("Unable to open memory stream!");
++        dprint (1, (debugfile, "Can't open memory stream.\n"));
++        return -1;
++      }
++#else
+       mutt_mktemp (tempfile, sizeof (tempfile));
+       if ((s->fpout = safe_fopen (tempfile, "w")) == NULL)
        {
- 	/* decode to a tempfile, saving the original destination */
- 	fp = s->fpout;
-+#ifdef HAVE_FMEMOPEN
-+	if ((s->fpout = open_memstream(&temp, &tempsize)) == NULL)
-+	{
-+	  mutt_error _("Unable to open memory stream!");
-+	  dprint (1, (debugfile, "Can't open memory stream.\n"));
-+	  goto bail;
-+	}
-+#else
- 	mutt_mktemp (tempfile, sizeof (tempfile));
- 	if ((s->fpout = safe_fopen (tempfile, "w")) == NULL)
- 	{
-@@ -1718,6 +1731,7 @@ int mutt_body_handler (BODY *b, STATE *s)
- 	  dprint (1, (debugfile, "Can't open %s.\n", tempfile));
- 	  goto bail;
- 	}
-+#endif
- 	/* decoding the attachment changes the size and offset, so save a copy
- 	 * of the "real" values now, and restore them after processing
- 	 */
-@@ -1746,8 +1760,19 @@ int mutt_body_handler (BODY *b, STATE *s)
- 	/* restore final destination and substitute the tempfile for input */
- 	s->fpout = fp;
- 	fp = s->fpin;
-+#ifdef HAVE_FMEMOPEN
-+	if(tempsize)
-+		s->fpin = fmemopen(temp, tempsize, "r");
-+	else /* fmemopen cannot handle zero-length buffers */
-+		s->fpin = safe_fopen ("/dev/null", "r");
-+	if(s->fpin == NULL) {
-+		mutt_perror("failed to re-open memstream!");
-+		return (-1);
-+	}
-+#else
- 	s->fpin = fopen (tempfile, "r");
- 	unlink (tempfile);
-+#endif
- 
- 	/* restore the prefix */
- 	s->prefix = savePrefix;
-@@ -1773,6 +1798,10 @@ int mutt_body_handler (BODY *b, STATE *s)
- 
- 	/* restore the original source stream */
- 	safe_fclose (&s->fpin);
-+#ifdef HAVE_FMEMOPEN
-+	if(tempsize)
-+	    FREE(&temp);
-+#endif
- 	s->fpin = fp;
+@@ -1625,6 +1638,7 @@ static int run_decode_and_handler (BODY *b, STATE *s, handler_t handler, int pla
+         dprint (1, (debugfile, "Can't open %s.\n", tempfile));
+         return -1;
        }
++#endif
+       /* decoding the attachment changes the size and offset, so save a copy
+         * of the "real" values now, and restore them after processing
+         */
+@@ -1653,8 +1667,19 @@ static int run_decode_and_handler (BODY *b, STATE *s, handler_t handler, int pla
+       /* restore final destination and substitute the tempfile for input */
+       s->fpout = fp;
+       fp = s->fpin;
++#ifdef HAVE_FMEMOPEN
++      if(tempsize)
++         s->fpin = fmemopen(temp, tempsize, "r");
++      else /* fmemopen cannot handle zero-length buffers */
++         s->fpin = safe_fopen ("/dev/null", "r");
++      if(s->fpin == NULL) {
++         mutt_perror("failed to re-open memstream!");
++         return (-1);
++      }
++#else
+       s->fpin = fopen (tempfile, "r");
+       unlink (tempfile);
++#endif
+ 
+       /* restore the prefix */
+       s->prefix = savePrefix;
+@@ -1680,6 +1705,10 @@ static int run_decode_and_handler (BODY *b, STATE *s, handler_t handler, int pla
+ 
+       /* restore the original source stream */
+       safe_fclose (&s->fpin);
++#ifdef HAVE_FMEMOPEN
++      if(tempsize)
++          FREE(&temp);
++#endif
+       s->fpin = fp;
      }
+   }
 --- a/imap/command.c
 +++ b/imap/command.c
 @@ -1012,6 +1012,13 @@ static void cmd_parse_status (IMAP_DATA* idata, char* s)
@@ -716,7 +716,7 @@
        }
 --- a/imap/imap.c
 +++ b/imap/imap.c
-@@ -1514,7 +1514,7 @@ int imap_buffy_check (int force)
+@@ -1523,7 +1523,7 @@ int imap_buffy_check (int force)
  
      imap_munge_mbox_name (munged, sizeof (munged), name);
      snprintf (command, sizeof (command),
@@ -727,7 +727,7 @@
      {
 --- a/init.h
 +++ b/init.h
-@@ -1966,6 +1966,54 @@ struct option_t MuttVars[] = {
+@@ -2016,6 +2016,54 @@ struct option_t MuttVars[] = {
    ** not used.
    ** (PGP only)
    */
@@ -791,7 +791,7 @@
 +#define M_PEEK		(1<<5) /* revert atime back after taking a look (if applicable) */
  
  /* mx_open_new_message() */
- #define M_ADD_FROM	1	/* add a From_ line */
+ #define M_ADD_FROM	(1<<0)	/* add a From_ line */
 --- a/main.c
 +++ b/main.c
 @@ -50,6 +50,7 @@
@@ -811,7 +811,7 @@
    char *subject = NULL;
    char *includeFile = NULL;
    char *draftFile = NULL;
-@@ -1025,6 +1026,13 @@ int main (int argc, char **argv)
+@@ -1036,6 +1037,13 @@ int main (int argc, char **argv)
        strfcpy (folder, NONULL(Spoolfile), sizeof (folder));
      mutt_expand_path (folder, sizeof (folder));
  
@@ -825,7 +825,7 @@
      mutt_str_replace (&CurrentFolder, folder);
      mutt_str_replace (&LastFolder, folder);
  
-@@ -1047,6 +1055,7 @@ int main (int argc, char **argv)
+@@ -1058,6 +1066,7 @@ int main (int argc, char **argv)
      if((Context = mx_open_mailbox (folder, ((flags & M_RO) || option (OPTREADONLY)) ? M_READONLY : 0, NULL))
         || !explicit_folder)
      {
@@ -985,7 +985,7 @@
    int fd;
 --- a/mutt.h
 +++ b/mutt.h
-@@ -421,6 +421,10 @@ enum
+@@ -423,6 +423,10 @@ enum
    OPTSAVEEMPTY,
    OPTSAVENAME,
    OPTSCORE,
@@ -996,7 +996,7 @@
    OPTSIGDASHES,
    OPTSIGONTOP,
    OPTSORTRE,
-@@ -861,6 +865,7 @@ typedef struct _context
+@@ -866,6 +870,7 @@ typedef struct _context
  {
    char *path;
    FILE *fp;
@@ -1004,7 +1004,7 @@
    time_t mtime;
    off_t size;
    off_t vsize;
-@@ -895,6 +900,7 @@ typedef struct _context
+@@ -900,6 +905,7 @@ typedef struct _context
    unsigned int quiet : 1;	/* inhibit status messages? */
    unsigned int collapsed : 1;   /* are all threads collapsed? */
    unsigned int closing : 1;	/* mailbox is being closed */
@@ -1022,10 +1022,10 @@
  #define CLEARLINE(x) move(x,0), clrtoeol()
  #define CENTERLINE(x,y) move(y, (COLS-strlen(x))/2), addstr(x)
  #define BEEP() do { if (option (OPTBEEP)) beep(); } while (0)
-@@ -120,6 +121,8 @@ enum
-   MT_COLOR_BOLD,
+@@ -121,6 +122,8 @@ enum
    MT_COLOR_UNDERLINE,
    MT_COLOR_INDEX,
+   MT_COLOR_PROMPT,
 +  MT_COLOR_NEW,
 +  MT_COLOR_FLAGGED,
    MT_COLOR_MAX
@@ -1043,7 +1043,7 @@
  
 --- a/muttlib.c
 +++ b/muttlib.c
-@@ -1281,6 +1281,8 @@ void mutt_FormatString (char *dest,		/* output buffer */
+@@ -1276,6 +1276,8 @@ void mutt_FormatString (char *dest,		/* output buffer */
  	  pl = pw = 1;
  
  	/* see if there's room to add content, else ignore */
@@ -1052,7 +1052,7 @@
  	if ((col < COLS && wlen < destlen) || soft)
  	{
  	  int pad;
-@@ -1324,6 +1326,52 @@ void mutt_FormatString (char *dest,		/* output buffer */
+@@ -1319,6 +1321,52 @@ void mutt_FormatString (char *dest,		/* output buffer */
  	  col += wid;
  	  src += pl;
  	}
@@ -1275,9 +1275,9 @@
 +      if(!option(OPTSTATUSONTOP) || PagerIndexLines == 0)
 +          DrawFullLine = 0; /* reset */
        NORMAL_COLOR;
-     }
- 
-@@ -1819,16 +1834,22 @@ mutt_pager (const char *banner, const char *fname, int flags, pager_t *extra)
+       if (option(OPTTSENABLED) && TSSupported)
+       {
+@@ -1826,16 +1841,22 @@ mutt_pager (const char *banner, const char *fname, int flags, pager_t *extra)
        /* redraw the pager_index indicator, because the
         * flags for this message might have changed. */
        menu_redraw_current (index);
@@ -1302,7 +1302,7 @@
      redraw = 0;
  
      if (option(OPTBRAILLEFRIENDLY)) {
-@@ -2763,6 +2784,13 @@ search_next:
+@@ -2770,6 +2791,13 @@ search_next:
  	mutt_what_key ();
  	break;
  
